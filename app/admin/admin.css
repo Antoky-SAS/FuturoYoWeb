@@ -1,0 +1,133 @@
+.adm {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px clamp(16px, 4vw, 40px) 64px;
+  font: 400 14px var(--sans);
+  color: var(--text);
+}
+.adm h1 {
+  font: 400 32px var(--serif);
+  margin: 0;
+}
+.adm a {
+  color: var(--sky);
+}
+.adm-dim {
+  color: var(--dim);
+}
+.adm-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-actions {
+  display: flex;
+  gap: 8px;
+}
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: none;
+  background: var(--grad);
+  color: #fff !important;
+  font: 600 13px var(--sans);
+  cursor: pointer;
+}
+.adm-btn.ghost {
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 24px 0;
+}
+.adm-stats div {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.adm-stats b {
+  font: 400 28px var(--serif);
+}
+.adm-stats span {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.adm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.adm select,
+.adm input {
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+}
+.adm select option {
+  background: #0d1430;
+}
+.adm-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.adm table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.adm th,
+.adm td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.adm th {
+  color: var(--muted);
+  font-weight: 500;
+  background: var(--bg);
+}
+.adm tbody tr:hover {
+  background: rgba(89, 121, 252, 0.06);
+}
+.adm-login {
+  max-width: 320px;
+  margin: 18vh auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-login button {
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--grad);
+  color: #fff;
+  font: 600 14px var(--sans);
+  cursor: pointer;
+}
+.adm-login input {
+  height: 42px;
+}
+.adm-err {
+  color: #ff8c8c;
+  margin: 0;
+}

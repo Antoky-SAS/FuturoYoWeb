@@ -1,13 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { joinWaitlist } from "./actions";
 
 const AREAS = ["Profesional", "Finanzas", "Salud", "Relaciones", "Personal", "Estilo de vida"];
 const KEY = "fy-waitlist-v1";
 const VID = "JFD6Yy8aqfI";
 const START = 4101;
+const FADE_IN_MS = 3000;
+const FADE_OUT_MS = 1200;
 
-type Joined = { name: string; email: string; area: string; ent: string; base: number; refs: number; code: string };
+type Joined = { name: string; pos: number };
 
 type YTPlayer = { playVideo(): void; pauseVideo(): void; setVolume(v: number): void; seekTo(s: number, a: boolean): void; destroy(): void };
 type YTNamespace = { Player: new (el: HTMLElement, opts: object) => YTPlayer };
@@ -57,6 +60,7 @@ export default function Waitlist() {
   const [ent, setEnt] = useState("Sí");
   const [joined, setJoined] = useState<Joined | null>(null);
   const [err, setErr] = useState("");
+  const [pending, setPending] = useState(false);
   const [sound, setSoundState] = useState(false);
   const [vol, setVol] = useState(35);
   const [eq, setEq] = useState<number[] | null>(null);
@@ -65,22 +69,48 @@ export default function Waitlist() {
   const ytReady = useRef(false);
   const wantPlay = useRef(false);
   const volRef = useRef(vol);
+  const curVol = useRef(0);
+  const fadeRaf = useRef(0);
   const soundRef = useRef(sound);
   const cardRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLIFrameElement>(null);
   const heroRef = useRef<HTMLElement>(null);
 
+  // Ramp the player's volume to `target` over `ms`, then run `done`.
+  const fadeTo = useCallback((target: number, ms: number, done?: () => void) => {
+    cancelAnimationFrame(fadeRaf.current);
+    const from = curVol.current;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / ms);
+      const eased = p * p * (3 - 2 * p);
+      curVol.current = from + (target - from) * eased;
+      yt.current?.setVolume(Math.round(curVol.current));
+      if (p < 1) fadeRaf.current = requestAnimationFrame(step);
+      else done?.();
+    };
+    fadeRaf.current = requestAnimationFrame(step);
+  }, []);
+
+  const startPlayback = useCallback(() => {
+    if (!yt.current) return;
+    curVol.current = 0;
+    yt.current.setVolume(0);
+    yt.current.playVideo();
+    fadeTo(volRef.current, FADE_IN_MS);
+  }, [fadeTo]);
+
   const setSound = useCallback((on: boolean) => {
     wantPlay.current = on;
     soundRef.current = on;
     if (ytReady.current && yt.current) {
-      if (on) yt.current.playVideo();
-      else yt.current.pauseVideo();
+      if (on) startPlayback();
+      else fadeTo(0, FADE_OUT_MS, () => yt.current?.pauseVideo());
     }
     store("fy-sound", on ? "on" : "off");
     setSoundState(on);
     setEq(null);
-  }, []);
+  }, [fadeTo, startPlayback]);
 
   // Equalizer bars animate while music plays.
   useEffect(() => {
@@ -94,7 +124,9 @@ export default function Waitlist() {
   useEffect(() => {
     try {
       const j = JSON.parse(storage(KEY) || "null");
-      if (j) setJoined(j);
+      // Older local-only entries had no server position; ignore them.
+      if (j && typeof j.pos === "number" && j.pos > 0) setJoined(j);
+      else if (j) store(KEY, null);
     } catch {}
     const v = parseInt(storage("fy-vol") ?? "", 10);
     if (!isNaN(v)) {
@@ -123,8 +155,8 @@ export default function Waitlist() {
         events: {
           onReady: () => {
             ytReady.current = true;
-            yt.current?.setVolume(volRef.current);
-            if (wantPlay.current) yt.current?.playVideo();
+            yt.current?.setVolume(0);
+            if (wantPlay.current) startPlayback();
           },
           onStateChange: (e: { data: number }) => {
             if (e.data === 0) {
@@ -148,6 +180,7 @@ export default function Waitlist() {
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(fadeRaf.current);
       document.removeEventListener("pointerdown", firstGesture, true);
       document.removeEventListener("keydown", firstGesture, true);
       yt.current?.destroy();
@@ -155,7 +188,7 @@ export default function Waitlist() {
       ytReady.current = false;
       host.remove();
     };
-  }, [setSound]);
+  }, [setSound, startPlayback]);
 
   // Drive the avatar's scroll zoom from page scroll.
   useEffect(() => {
@@ -179,28 +212,33 @@ export default function Waitlist() {
   const onVol = (v: number) => {
     setVol(v);
     volRef.current = v;
-    if (ytReady.current) yt.current?.setVolume(v);
+    // Slider wins over any fade in progress, but never unmutes a paused player.
+    if (ytReady.current && soundRef.current) {
+      cancelAnimationFrame(fadeRaf.current);
+      curVol.current = v;
+      yt.current?.setVolume(v);
+    }
     store("fy-vol", String(v));
   };
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (pending) return;
     if (!name.trim()) return setErr("Escribe tu nombre.");
     if (!/\S+@\S+\.\S+/.test(email)) return setErr("Revisa tu correo electrónico.");
-    const code =
-      (name.trim().split(/\s+/)[0].toLowerCase().normalize("NFD").replace(/[^a-z]/g, "") || "yo") +
-      Math.floor(100 + Math.random() * 900);
-    const j: Joined = {
-      name: name.trim(),
-      email: email.trim(),
-      area,
-      ent,
-      base: 1180 + Math.floor(Math.random() * 260),
-      refs: 0,
-      code,
-    };
-    setJoined(j);
-    store(KEY, JSON.stringify(j));
+    const website = String(new FormData(e.currentTarget).get("website") ?? "");
+    setPending(true);
+    try {
+      const res = await joinWaitlist({ name, email, area, ent, website });
+      if (!res.ok) return setErr(res.error);
+      const j: Joined = { name: res.name, pos: res.pos };
+      setJoined(j);
+      store(KEY, JSON.stringify(j));
+    } catch {
+      setErr("No pudimos conectar. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setPending(false);
+    }
   };
 
   const reset = () => {
@@ -231,7 +269,7 @@ export default function Waitlist() {
     el.style.setProperty("--glare", "0");
   };
 
-  const pos = joined ? Math.max(1, joined.base - joined.refs * 25) : 0;
+  const pos = joined ? joined.pos : 0;
   const firstName = joined ? joined.name.split(/\s+/)[0] : "";
   const soundLabel = sound ? "Silenciar música" : "Activar música";
 
@@ -375,8 +413,9 @@ export default function Waitlist() {
                     </div>
                   </div>
                   {err && <div className="fy-err" role="alert">{err}</div>}
-                  <button type="submit" className="fy-submit">
-                    Quiero unirme a la lista de espera
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="fy-hp" />
+                  <button type="submit" className="fy-submit" disabled={pending} aria-busy={pending}>
+                    {pending ? "Uniéndote…" : "Quiero unirme a la lista de espera"}
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12h14M13 6l6 6-6 6" />
                     </svg>

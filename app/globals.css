@@ -433,6 +433,17 @@ a:hover {
   gap: 10px;
   box-shadow: 0 10px 30px rgba(89, 121, 252, 0.35);
 }
+.fy-submit:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+.fy-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
 
 /* ===== Joined card ===== */
 .fy-joined {
