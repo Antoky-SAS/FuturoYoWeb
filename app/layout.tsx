@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   title: "FuturoYo · Lista de espera",
   description:
     "FuturoYo convierte a la persona que quieres ser en metas, hábitos y acciones para hoy. Entra a la lista de espera.",
-  icons: { icon: "/assets/logo-v2.png" },
 };
 
 export const viewport: Viewport = {
